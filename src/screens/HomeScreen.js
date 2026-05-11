@@ -17,7 +17,18 @@ import {
   searchNotes,
 } from '../database/noteRepository';
 
+import {
+  saveTheme,
+  getTheme,
+  saveFontSize,
+  getFontSize,
+} from '../storage/settingsStorage';
+
 export default function HomeScreen() {
+
+  const [theme, setTheme] = useState('light');
+
+  const [fontSize, setFontSize] = useState(16);
 
   const [notes, setNotes] = useState([]);
 
@@ -25,14 +36,37 @@ export default function HomeScreen() {
   const [content, setContent] = useState('');
 
   const [editingId, setEditingId] = useState(null);
+
   const [search, setSearch] = useState('');
 
   const loadNotes = () => {
+
     const data = getNotes();
 
     setNotes(data);
   };
 
+ const loadSettings = async () => {
+
+    const savedTheme = await getTheme();
+
+    const savedFontSize = await getFontSize();
+
+    if (savedTheme) {
+        setTheme(savedTheme);
+    }
+
+    if (savedFontSize) {
+
+        const parsedSize = Number(savedFontSize);
+
+        if (parsedSize > 0) {
+        setFontSize(parsedSize);
+        } else {
+        setFontSize(16);
+        }
+    }
+   };
 
   const handleSearch = (text) => {
 
@@ -40,18 +74,22 @@ export default function HomeScreen() {
 
     if (!text.trim()) {
 
-        loadNotes();
+      loadNotes();
 
-        return;
+      return;
     }
 
     const result = searchNotes(text);
 
     setNotes(result);
- };
+  };
 
   useEffect(() => {
+
     loadNotes();
+
+    loadSettings();
+
   }, []);
 
   const handleSave = () => {
@@ -94,32 +132,169 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor:
+            theme === 'dark'
+              ? '#111827'
+              : '#FFFFFF',
+        },
+      ]}
+    >
 
-      <Text style={styles.title}>
+      <Text
+        style={[
+          styles.title,
+          {
+            color:
+              theme === 'dark'
+                ? 'white'
+                : 'black',
+          },
+        ]}
+      >
         NoteApp
       </Text>
 
+      <TouchableOpacity
+        style={styles.themeButton}
+        onPress={async () => {
+
+          const newTheme =
+            theme === 'light'
+              ? 'dark'
+              : 'light';
+
+          setTheme(newTheme);
+
+          await saveTheme(newTheme);
+        }}
+      >
+        <Text style={styles.buttonText}>
+          Theme: {theme}
+        </Text>
+      </TouchableOpacity>
+
+      <View style={styles.fontContainer}>
+
+        <TouchableOpacity
+          style={styles.fontButton}
+          onPress={async () => {
+
+            if (fontSize <= 12) {
+              return;
+            }
+
+            const newSize = fontSize - 2;
+
+            setFontSize(newSize);
+
+            await saveFontSize(newSize);
+          }}
+        >
+          <Text style={styles.buttonText}>
+            A-
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.fontButton}
+          onPress={async () => {
+
+            if (fontSize >= 30) {
+              return;
+            }
+
+            const newSize = fontSize + 2;
+
+            setFontSize(newSize);
+
+            await saveFontSize(newSize);
+          }}
+        >
+          <Text style={styles.buttonText}>
+            A+
+          </Text>
+        </TouchableOpacity>
+
+      </View>
+
       <TextInput
         placeholder="Cari note..."
+        placeholderTextColor={
+          theme === 'dark'
+            ? '#9CA3AF'
+            : '#6B7280'
+        }
         value={search}
         onChangeText={handleSearch}
-        style={styles.searchInput}
+        style={[
+          styles.searchInput,
+          {
+            backgroundColor:
+              theme === 'dark'
+                ? '#1F2937'
+                : 'white',
+
+            color:
+              theme === 'dark'
+                ? 'white'
+                : 'black',
+          },
+        ]}
       />
 
       <TextInput
         placeholder="Judul note"
+        placeholderTextColor={
+          theme === 'dark'
+            ? '#9CA3AF'
+            : '#6B7280'
+        }
         value={title}
         onChangeText={setTitle}
-        style={styles.input}
+        style={[
+          styles.input,
+          {
+            backgroundColor:
+              theme === 'dark'
+                ? '#1F2937'
+                : 'white',
+
+            color:
+              theme === 'dark'
+                ? 'white'
+                : 'black',
+          },
+        ]}
       />
 
       <TextInput
         placeholder="Isi note"
+        placeholderTextColor={
+          theme === 'dark'
+            ? '#9CA3AF'
+            : '#6B7280'
+        }
         value={content}
         onChangeText={setContent}
         multiline
-        style={styles.textArea}
+        style={[
+          styles.textArea,
+          {
+            backgroundColor:
+              theme === 'dark'
+                ? '#1F2937'
+                : 'white',
+
+            color:
+              theme === 'dark'
+                ? 'white'
+                : 'black',
+          },
+        ]}
       />
 
       <TouchableOpacity
@@ -137,13 +312,47 @@ export default function HomeScreen() {
         style={styles.list}
         renderItem={({ item }) => (
 
-          <View style={styles.noteCard}>
+          <View
+            style={[
+              styles.noteCard,
+              {
+                backgroundColor:
+                  theme === 'dark'
+                    ? '#1F2937'
+                    : 'white',
+              },
+            ]}
+          >
 
-            <Text style={styles.noteTitle}>
+            <Text
+              style={[
+                styles.noteTitle,
+                {
+                  fontSize,
+
+                  color:
+                    theme === 'dark'
+                      ? 'white'
+                      : 'black',
+                },
+              ]}
+            >
               {item.title}
             </Text>
 
-            <Text style={styles.noteContent}>
+            <Text
+              style={[
+                styles.noteContent,
+                {
+                  fontSize: fontSize - 2,
+
+                  color:
+                    theme === 'dark'
+                      ? 'white'
+                      : 'black',
+                },
+              ]}
+            >
               {item.content}
             </Text>
 
@@ -180,21 +389,18 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
 
-  // CONTAINER
   container: {
     flex: 1,
     padding: 20,
     marginTop: 50,
   },
 
-  // HEADER
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
   },
 
-  // INPUT
   input: {
     borderWidth: 1,
     padding: 10,
@@ -217,7 +423,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 
-  // BUTTON
   saveButton: {
     backgroundColor: '#2563EB',
     padding: 14,
@@ -230,12 +435,30 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // LIST
+  themeButton: {
+    backgroundColor: '#7C3AED',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
+  fontContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 15,
+  },
+
+  fontButton: {
+    backgroundColor: '#059669',
+    padding: 12,
+    borderRadius: 10,
+  },
+
   list: {
     marginTop: 20,
   },
 
-  // NOTE CARD
   noteCard: {
     borderWidth: 1,
     padding: 15,
@@ -244,7 +467,6 @@ const styles = StyleSheet.create({
   },
 
   noteTitle: {
-    fontSize: 18,
     fontWeight: 'bold',
   },
 
@@ -252,7 +474,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
-  // ACTION BUTTONS
   actionContainer: {
     flexDirection: 'row',
     gap: 10,
