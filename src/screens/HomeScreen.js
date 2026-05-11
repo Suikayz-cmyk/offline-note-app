@@ -24,10 +24,13 @@ import {
   getFontSize,
 } from '../storage/settingsStorage';
 
+import NetInfo from '@react-native-community/netinfo';
+
 export default function HomeScreen() {
 
-  const [theme, setTheme] = useState('light');
+  const [isConnected, setIsConnected] = useState(true);
 
+  const [theme, setTheme] = useState('light');
   const [fontSize, setFontSize] = useState(16);
 
   const [notes, setNotes] = useState([]);
@@ -36,20 +39,16 @@ export default function HomeScreen() {
   const [content, setContent] = useState('');
 
   const [editingId, setEditingId] = useState(null);
-
   const [search, setSearch] = useState('');
 
   const loadNotes = () => {
-
     const data = getNotes();
 
     setNotes(data);
   };
 
  const loadSettings = async () => {
-
     const savedTheme = await getTheme();
-
     const savedFontSize = await getFontSize();
 
     if (savedTheme) {
@@ -57,7 +56,6 @@ export default function HomeScreen() {
     }
 
     if (savedFontSize) {
-
         const parsedSize = Number(savedFontSize);
 
         if (parsedSize > 0) {
@@ -69,18 +67,14 @@ export default function HomeScreen() {
    };
 
   const handleSearch = (text) => {
-
     setSearch(text);
 
     if (!text.trim()) {
-
       loadNotes();
-
       return;
     }
 
     const result = searchNotes(text);
-
     setNotes(result);
   };
 
@@ -89,6 +83,15 @@ export default function HomeScreen() {
     loadNotes();
 
     loadSettings();
+
+    const unsubscribe = NetInfo.addEventListener(state => {
+
+        setIsConnected(state.isConnected);
+    });
+
+    return () => {
+        unsubscribe();
+    };
 
   }, []);
 
@@ -157,6 +160,21 @@ export default function HomeScreen() {
       >
         NoteApp
       </Text>
+
+      {!isConnected && (
+            <Text style={[
+                styles.offlineText,
+                {
+                    color:
+                    theme === 'dark'
+                        ? 'white'
+                        : 'black',
+                },
+            ]}>
+                Sedang berada dalam mode tanpa internet.
+            </Text>
+        )
+    }
 
       <TouchableOpacity
         style={styles.themeButton}
@@ -399,6 +417,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
+  },
+
+  offlineText: {
+    color: 'white',
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 
   input: {
