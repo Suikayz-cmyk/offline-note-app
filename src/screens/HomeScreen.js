@@ -1,33 +1,15 @@
 import { useEffect, useState } from 'react';
-
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
-
-import {
-  createNote,
-  getNotes,
-  updateNote,
-  deleteNote,
-  searchNotes,
-} from '../database/noteRepository';
-
-import {
-  saveTheme,
-  getTheme,
-  saveFontSize,
-  getFontSize,
-} from '../storage/settingsStorage';
-
+import {  View,  Text,  TextInput,  FlatList,  TouchableOpacity,  StyleSheet,} from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+
+import { createNote,getNotes, updateNote, deleteNote, searchNotes,} from '../database/noteRepository';
+import { saveTheme, getTheme, saveFontSize, getFontSize,} from '../storage/settingsStorage';
+import { saveToken, getToken, deleteToken,} from '../storage/secureStorage';
 
 export default function HomeScreen() {
 
+  const [isLoading, setIsLoading] = useState(true);
+  const [token, setToken] = useState(null);
   const [isConnected, setIsConnected] = useState(true);
 
   const [theme, setTheme] = useState('light');
@@ -47,24 +29,27 @@ export default function HomeScreen() {
     setNotes(data);
   };
 
- const loadSettings = async () => {
+  const loadSettings = async () => {
     const savedTheme = await getTheme();
     const savedFontSize = await getFontSize();
+    const savedToken = await getToken();
 
     if (savedTheme) {
-        setTheme(savedTheme);
+      setTheme(savedTheme);
     }
 
     if (savedFontSize) {
-        const parsedSize = Number(savedFontSize);
-
-        if (parsedSize > 0) {
+      const parsedSize = Number(savedFontSize);
+      if (parsedSize > 0) {
         setFontSize(parsedSize);
-        } else {
-        setFontSize(16);
-        }
+      }
     }
-   };
+
+    if (savedToken) {
+      setToken(savedToken);
+    }
+    setIsLoading(false);
+  };
 
   const handleSearch = (text) => {
     setSearch(text);
@@ -79,24 +64,20 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-
     loadNotes();
 
     loadSettings();
 
     const unsubscribe = NetInfo.addEventListener(state => {
-
         setIsConnected(state.isConnected);
     });
 
     return () => {
         unsubscribe();
     };
-
   }, []);
 
   const handleSave = () => {
-
     if (!title.trim()) {
       return;
     }
@@ -108,19 +89,15 @@ export default function HomeScreen() {
       setEditingId(null);
 
     } else {
-
       createNote(title, content);
-
     }
 
     setTitle('');
     setContent('');
-
     loadNotes();
   };
 
   const handleEdit = (note) => {
-
     setTitle(note.title);
     setContent(note.content);
 
@@ -128,21 +105,50 @@ export default function HomeScreen() {
   };
 
   const handleDelete = (id) => {
-
     deleteNote(id);
-
     loadNotes();
   };
+
+  if (isLoading) {
+  return (
+      <View style={styles.centerContainer}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!token) {
+  return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loginTitle}>
+          Welcome to NoteApp
+        </Text>
+
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={async () => {
+
+            const fakeToken = 'user_token_123';
+
+            await saveToken(fakeToken);
+
+            setToken(fakeToken);
+          }}
+        >
+          <Text style={styles.buttonText}>
+            Login
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View
       style={[
         styles.container,
         {
-          backgroundColor:
-            theme === 'dark'
-              ? '#111827'
-              : '#FFFFFF',
+          backgroundColor: theme === 'dark' ? '#111827' : '#FFFFFF',
         },
       ]}
     >
@@ -151,24 +157,32 @@ export default function HomeScreen() {
         style={[
           styles.title,
           {
-            color:
-              theme === 'dark'
-                ? 'white'
-                : 'black',
+            color: theme === 'dark' ? 'white' : 'black',
           },
         ]}
       >
         NoteApp
       </Text>
 
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={async () => {
+
+          await deleteToken();
+
+          setToken(null);
+        }}
+      >
+        <Text style={styles.buttonText}>
+          Logout
+        </Text>
+      </TouchableOpacity>
+
       {!isConnected && (
             <Text style={[
                 styles.offlineText,
                 {
-                    color:
-                    theme === 'dark'
-                        ? 'white'
-                        : 'black',
+                    color: theme === 'dark' ? 'white' : 'black',
                 },
             ]}>
                 Sedang berada dalam mode tanpa internet.
@@ -180,10 +194,7 @@ export default function HomeScreen() {
         style={styles.themeButton}
         onPress={async () => {
 
-          const newTheme =
-            theme === 'light'
-              ? 'dark'
-              : 'light';
+          const newTheme =  theme === 'light' ? 'dark' : 'light';
 
           setTheme(newTheme);
 
@@ -212,9 +223,7 @@ export default function HomeScreen() {
             await saveFontSize(newSize);
           }}
         >
-          <Text style={styles.buttonText}>
-            A-
-          </Text>
+          <Text style={styles.buttonText}>A-</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -232,9 +241,7 @@ export default function HomeScreen() {
             await saveFontSize(newSize);
           }}
         >
-          <Text style={styles.buttonText}>
-            A+
-          </Text>
+          <Text style={styles.buttonText}>A+</Text>
         </TouchableOpacity>
 
       </View>
@@ -242,24 +249,16 @@ export default function HomeScreen() {
       <TextInput
         placeholder="Cari note..."
         placeholderTextColor={
-          theme === 'dark'
-            ? '#9CA3AF'
-            : '#6B7280'
+          theme === 'dark' ? '#9CA3AF' : '#6B7280'
         }
         value={search}
         onChangeText={handleSearch}
         style={[
           styles.searchInput,
           {
-            backgroundColor:
-              theme === 'dark'
-                ? '#1F2937'
-                : 'white',
+            backgroundColor:theme === 'dark' ? '#1F2937' : 'white',
 
-            color:
-              theme === 'dark'
-                ? 'white'
-                : 'black',
+            color: theme === 'dark' ? 'white' : 'black',
           },
         ]}
       />
@@ -267,24 +266,16 @@ export default function HomeScreen() {
       <TextInput
         placeholder="Judul note"
         placeholderTextColor={
-          theme === 'dark'
-            ? '#9CA3AF'
-            : '#6B7280'
+          theme === 'dark' ? '#9CA3AF' : '#6B7280'
         }
         value={title}
         onChangeText={setTitle}
         style={[
           styles.input,
           {
-            backgroundColor:
-              theme === 'dark'
-                ? '#1F2937'
-                : 'white',
+            backgroundColor: theme === 'dark' ? '#1F2937' : 'white',
 
-            color:
-              theme === 'dark'
-                ? 'white'
-                : 'black',
+            color: theme === 'dark' ? 'white' : 'black',
           },
         ]}
       />
@@ -292,9 +283,7 @@ export default function HomeScreen() {
       <TextInput
         placeholder="Isi note"
         placeholderTextColor={
-          theme === 'dark'
-            ? '#9CA3AF'
-            : '#6B7280'
+          theme === 'dark' ? '#9CA3AF' : '#6B7280'
         }
         value={content}
         onChangeText={setContent}
@@ -302,15 +291,9 @@ export default function HomeScreen() {
         style={[
           styles.textArea,
           {
-            backgroundColor:
-              theme === 'dark'
-                ? '#1F2937'
-                : 'white',
+            backgroundColor: theme === 'dark' ? '#1F2937' : 'white',
 
-            color:
-              theme === 'dark'
-                ? 'white'
-                : 'black',
+            color: theme === 'dark' ? 'white' : 'black',
           },
         ]}
       />
@@ -334,10 +317,7 @@ export default function HomeScreen() {
             style={[
               styles.noteCard,
               {
-                backgroundColor:
-                  theme === 'dark'
-                    ? '#1F2937'
-                    : 'white',
+                backgroundColor: theme === 'dark' ? '#1F2937' : 'white',
               },
             ]}
           >
@@ -348,10 +328,7 @@ export default function HomeScreen() {
                 {
                   fontSize,
 
-                  color:
-                    theme === 'dark'
-                      ? 'white'
-                      : 'black',
+                  color: theme === 'dark' ? 'white' : 'black',
                 },
               ]}
             >
@@ -364,10 +341,7 @@ export default function HomeScreen() {
                 {
                   fontSize: fontSize - 2,
 
-                  color:
-                    theme === 'dark'
-                      ? 'white'
-                      : 'black',
+                  color: theme === 'dark' ? 'white' : 'black',
                 },
               ]}
             >
@@ -411,6 +385,19 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     marginTop: 50,
+  },
+
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+
+  loginTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 20,
   },
 
   title: {
@@ -521,6 +508,22 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+
+  loginButton: {
+    backgroundColor: '#2563EB',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
+  logoutButton: {
+    backgroundColor: '#DC2626',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
   },
 
 });
