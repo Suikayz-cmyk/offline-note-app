@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react';
 import {  View,  Text,  TextInput,  FlatList,  TouchableOpacity,  StyleSheet,} from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 
+import LoginScreen from './LoginScreen';
+
 import { createNote,getNotes, updateNote, deleteNote, searchNotes,} from '../database/noteRepository';
 import { saveTheme, getTheme, saveFontSize, getFontSize,} from '../storage/settingsStorage';
 import { saveToken, getToken, deleteToken,} from '../storage/secureStorage';
+import { addToQueue, getQueue, clearQueue,} from '../storage/syncQueueStorage';
 
 export default function HomeScreen() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState(null);
   const [isConnected, setIsConnected] = useState(true);
+  const [queueCount, setQueueCount] = useState(0);
 
   const [theme, setTheme] = useState('light');
   const [fontSize, setFontSize] = useState(16);
@@ -27,6 +31,11 @@ export default function HomeScreen() {
     const data = getNotes();
 
     setNotes(data);
+  };
+
+  const loadQueue = async () => {
+    const queue = await getQueue();
+    setQueueCount(queue.length);
   };
 
   const loadSettings = async () => {
@@ -65,8 +74,8 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadNotes();
-
     loadSettings();
+    loadQueue();
 
     const unsubscribe = NetInfo.addEventListener(state => {
         setIsConnected(state.isConnected);
@@ -77,7 +86,7 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim()) {
       return;
     }
@@ -94,6 +103,22 @@ export default function HomeScreen() {
 
     setTitle('');
     setContent('');
+
+  if (!isConnected) {
+
+    await addToQueue({
+      type: editingId
+        ? 'UPDATE'
+        : 'CREATE',
+
+      title,
+      content,
+      time: Date.now(),
+    });
+
+    loadQueue();
+  }
+
     loadNotes();
   };
 
@@ -118,31 +143,21 @@ export default function HomeScreen() {
   }
 
   if (!token) {
-  return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loginTitle}>
-          Welcome to NoteApp
-        </Text>
 
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={async () => {
+    return (
+      <LoginScreen
+        onLogin={async () => {
 
-            const fakeToken = 'user_token_123';
+          const fakeToken =
+            'user_token_123';
 
-            await saveToken(fakeToken);
+          await saveToken(fakeToken);
 
-            setToken(fakeToken);
-          }}
-        >
-          <Text style={styles.buttonText}>
-            Login
-          </Text>
-        </TouchableOpacity>
-      </View>
+          setToken(fakeToken);
+        }}
+      />
     );
   }
-
   return (
     <View
       style={[
@@ -188,6 +203,20 @@ export default function HomeScreen() {
                 Sedang berada dalam mode tanpa internet.
             </Text>
         )
+    }
+
+    {
+      queueCount > 0 && (
+
+        <View style={styles.queueBanner}>
+
+          <Text style={styles.queueText}>
+            Pending Sync: {queueCount}
+          </Text>
+
+        </View>
+
+      )
     }
 
       <TouchableOpacity
@@ -524,6 +553,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 10,
+  },
+
+  queueBanner: {
+    backgroundColor: '#F59E0B',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+
+  queueText: {
+    color: 'white',
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 
 });
