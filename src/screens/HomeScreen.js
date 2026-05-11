@@ -14,6 +14,7 @@ import {
   getNotes,
   updateNote,
   deleteNote,
+  searchNotes,
 } from '../database/noteRepository';
 
 export default function HomeScreen() {
@@ -24,12 +25,30 @@ export default function HomeScreen() {
   const [content, setContent] = useState('');
 
   const [editingId, setEditingId] = useState(null);
+  const [search, setSearch] = useState('');
 
   const loadNotes = () => {
     const data = getNotes();
 
     setNotes(data);
   };
+
+
+  const handleSearch = (text) => {
+
+    setSearch(text);
+
+    if (!text.trim()) {
+
+        loadNotes();
+
+        return;
+    }
+
+    const result = searchNotes(text);
+
+    setNotes(result);
+ };
 
   useEffect(() => {
     loadNotes();
@@ -80,6 +99,13 @@ export default function HomeScreen() {
       <Text style={styles.title}>
         NoteApp
       </Text>
+
+      <TextInput
+        placeholder="Cari note..."
+        value={search}
+        onChangeText={handleSearch}
+        style={styles.searchInput}
+      />
 
       <TextInput
         placeholder="Judul note"
@@ -182,6 +208,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 8,
     height: 100,
+  },
+
+  searchInput: {
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 15,
+    borderRadius: 8,
   },
 
   // BUTTON

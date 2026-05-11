@@ -46,3 +46,18 @@ export const deleteNote = (id) => {
     [id]
   );
 };
+
+// SEARCH NOTES
+export const searchNotes = (keyword) => {
+
+  return db.getAllSync(
+    `
+      SELECT * FROM notes
+      WHERE title LIKE ?
+      OR content LIKE ?
+      ORDER BY updated_at DESC
+    `,
+    [`%${keyword}%`, `%${keyword}%`]
+  );
+
+};
