@@ -1,14 +1,8 @@
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet,} from 'react-native';
 
 export default function LoginScreen({
   onLogin,
 }) {
-
   return (
 
     <View style={styles.container}>

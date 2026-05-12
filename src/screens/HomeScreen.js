@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import {  View,  Text,  TextInput,  FlatList,  TouchableOpacity,  StyleSheet,} from 'react-native';
-import NetInfo from '@react-native-community/netinfo';
 
 import LoginScreen from './LoginScreen';
+import useNetwork from '../hooks/useNetwork';
+import OfflineBanner from '../components/OfflineBanner';
+import QueueBanner from '../components/QueueBanner';
+import SyncingBanner from '../components/SyncingBanner';
+import NoteCard from '../components/NoteCard';
+import useSync from '../hooks/useSync';
 
 import { createNote,getNotes, updateNote, deleteNote, searchNotes,} from '../database/noteRepository';
 import { saveTheme, getTheme, saveFontSize, getFontSize,} from '../storage/settingsStorage';
@@ -11,10 +16,9 @@ import { addToQueue, getQueue, clearQueue,} from '../storage/syncQueueStorage';
 
 export default function HomeScreen() {
 
-  const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState(null);
-  const [isConnected, setIsConnected] = useState(true);
+  const isConnected = useNetwork();
   const [queueCount, setQueueCount] = useState(0);
 
   const [theme, setTheme] = useState('light');
@@ -27,6 +31,11 @@ export default function HomeScreen() {
 
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
+
+  const {
+    isSyncing,
+    processSyncQueue,
+  } = useSync();
 
   const loadNotes = () => {
     const data = getNotes();
@@ -61,30 +70,6 @@ export default function HomeScreen() {
     setIsLoading(false);
   };
 
-const processSyncQueue = async () => {
-  const queue = await getQueue();
-
-  if (queue.length === 0) {
-    return;
-  }
-
-  setIsSyncing(true);
-  console.log('Processing sync queue...');
-
-  for (const action of queue) {
-
-    console.log('Syncing:', action);
-
-    await new Promise(resolve =>
-      setTimeout(resolve, 500)
-    );
-  }
-
-  await clearQueue();
-  setQueueCount(0);
-  setIsSyncing(false);
-  console.log('Sync completed!');
-};
 
   const handleSearch = (text) => {
     setSearch(text);
@@ -102,24 +87,13 @@ const processSyncQueue = async () => {
     loadNotes();
     loadSettings();
     loadQueue();
-
-    const unsubscribe = NetInfo.addEventListener(
-      async state => {
-
-        const connected = state.isConnected;
-
-        setIsConnected(connected);
-
-        if (connected) {
-          await processSyncQueue();
-        }
-      }
-    );
-
-    return () => {
-        unsubscribe();
-    };
   }, []);
+
+  useEffect(() => {
+    if (isConnected) {
+      processSyncQueue(setQueueCount);
+    }
+  }, [isConnected]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -227,43 +201,17 @@ const processSyncQueue = async () => {
         </Text>
       </TouchableOpacity>
 
-      {!isConnected && (
-            <Text style={[
-                styles.offlineText,
-                {
-                    color: theme === 'dark' ? 'white' : 'black',
-                },
-            ]}>
-                Sedang berada dalam mode tanpa internet.
-            </Text>
-        )
-    }
+    {!isConnected && <OfflineBanner />}
 
     {
       queueCount > 0 && (
-
-        <View style={styles.queueBanner}>
-
-          <Text style={styles.queueText}>
-            Pending Sync: {queueCount}
-          </Text>
-
-        </View>
-
+        <QueueBanner
+          queueCount={queueCount}
+        />
       )
     }
 
-    {
-      isSyncing && (
-        <View style={styles.syncingBanner}>
-
-          <Text style={styles.syncingText}>
-            Syncing notes...
-          </Text>
-
-        </View>
-      )
-    }
+    {isSyncing && <SyncingBanner />}
 
       <TouchableOpacity
         style={styles.themeButton}
@@ -387,65 +335,13 @@ const processSyncQueue = async () => {
         keyExtractor={(item) => item.id.toString()}
         style={styles.list}
         renderItem={({ item }) => (
-
-          <View
-            style={[
-              styles.noteCard,
-              {
-                backgroundColor: theme === 'dark' ? '#1F2937' : 'white',
-              },
-            ]}
-          >
-
-            <Text
-              style={[
-                styles.noteTitle,
-                {
-                  fontSize,
-
-                  color: theme === 'dark' ? 'white' : 'black',
-                },
-              ]}
-            >
-              {item.title}
-            </Text>
-
-            <Text
-              style={[
-                styles.noteContent,
-                {
-                  fontSize: fontSize - 2,
-
-                  color: theme === 'dark' ? 'white' : 'black',
-                },
-              ]}
-            >
-              {item.content}
-            </Text>
-
-            <View style={styles.actionContainer}>
-
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => handleEdit(item)}
-              >
-                <Text style={styles.buttonText}>
-                  Edit
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => handleDelete(item.id)}
-              >
-                <Text style={styles.buttonText}>
-                  Delete
-                </Text>
-              </TouchableOpacity>
-
-            </View>
-
-          </View>
+          <NoteCard
+            item={item}
+            theme={theme}
+            fontSize={fontSize}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
 
         )}
       />
@@ -473,12 +369,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
-  },
-
-  offlineText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
   },
 
   input: {
@@ -539,52 +429,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 
-  noteCard: {
-    borderWidth: 1,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-
-  noteTitle: {
-    fontWeight: 'bold',
-  },
-
-  noteContent: {
-    marginTop: 5,
-  },
-
-  actionContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 10,
-  },
-
-  editButton: {
-    backgroundColor: '#F59E0B',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-  },
-
-  deleteButton: {
-    backgroundColor: '#DC2626',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-  },
-
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
-  },
-
-  loginButton: {
-    backgroundColor: '#2563EB',
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
   },
 
   logoutButton: {
@@ -593,32 +440,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 10,
-  },
-
-  queueBanner: {
-    backgroundColor: '#F59E0B',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 15,
-  },
-
-  queueText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-
-  syncingBanner: {
-    backgroundColor: '#2563EB',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 15,
-  },
-
-  syncingText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
   },
 
 });
