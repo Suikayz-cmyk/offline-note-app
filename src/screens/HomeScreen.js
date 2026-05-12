@@ -11,6 +11,7 @@ import { addToQueue, getQueue, clearQueue,} from '../storage/syncQueueStorage';
 
 export default function HomeScreen() {
 
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState(null);
   const [isConnected, setIsConnected] = useState(true);
@@ -60,6 +61,31 @@ export default function HomeScreen() {
     setIsLoading(false);
   };
 
+const processSyncQueue = async () => {
+  const queue = await getQueue();
+
+  if (queue.length === 0) {
+    return;
+  }
+
+  setIsSyncing(true);
+  console.log('Processing sync queue...');
+
+  for (const action of queue) {
+
+    console.log('Syncing:', action);
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 500)
+    );
+  }
+
+  await clearQueue();
+  setQueueCount(0);
+  setIsSyncing(false);
+  console.log('Sync completed!');
+};
+
   const handleSearch = (text) => {
     setSearch(text);
 
@@ -77,9 +103,18 @@ export default function HomeScreen() {
     loadSettings();
     loadQueue();
 
-    const unsubscribe = NetInfo.addEventListener(state => {
-        setIsConnected(state.isConnected);
-    });
+    const unsubscribe = NetInfo.addEventListener(
+      async state => {
+
+        const connected = state.isConnected;
+
+        setIsConnected(connected);
+
+        if (connected) {
+          await processSyncQueue();
+        }
+      }
+    );
 
     return () => {
         unsubscribe();
@@ -143,7 +178,6 @@ export default function HomeScreen() {
   }
 
   if (!token) {
-
     return (
       <LoginScreen
         onLogin={async () => {
@@ -216,6 +250,18 @@ export default function HomeScreen() {
 
         </View>
 
+      )
+    }
+
+    {
+      isSyncing && (
+        <View style={styles.syncingBanner}>
+
+          <Text style={styles.syncingText}>
+            Syncing notes...
+          </Text>
+
+        </View>
       )
     }
 
@@ -423,12 +469,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 
-  loginTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-
   title: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -563,6 +603,19 @@ const styles = StyleSheet.create({
   },
 
   queueText: {
+    color: 'white',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+  syncingBanner: {
+    backgroundColor: '#2563EB',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+
+  syncingText: {
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
