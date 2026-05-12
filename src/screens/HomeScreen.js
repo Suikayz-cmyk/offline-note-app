@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
-import {  View,  Text,  TextInput,  FlatList,  TouchableOpacity,  StyleSheet,} from 'react-native';
+import {  View,  Text,  TextInput,  FlatList, TouchableOpacity,  StyleSheet,} from 'react-native';
+import { Ionicons,} from '@expo/vector-icons';
 
 import LoginScreen from './LoginScreen';
 import useNetwork from '../hooks/useNetwork';
-import OfflineBanner from '../components/OfflineBanner';
-import QueueBanner from '../components/QueueBanner';
-import SyncingBanner from '../components/SyncingBanner';
 import NoteCard from '../components/NoteCard';
 import useSync from '../hooks/useSync';
+import SettingsModal from '../components/SettingsModal';
 
 import { createNote,getNotes, updateNote, deleteNote, searchNotes,} from '../database/noteRepository';
 import { saveTheme, getTheme, saveFontSize, getFontSize,} from '../storage/settingsStorage';
 import { saveToken, getToken, deleteToken,} from '../storage/secureStorage';
-import { addToQueue, getQueue, clearQueue,} from '../storage/syncQueueStorage';
+import { addToQueue, getQueue,} from '../storage/syncQueueStorage';
 
 export default function HomeScreen() {
 
@@ -23,6 +22,7 @@ export default function HomeScreen() {
 
   const [theme, setTheme] = useState('light');
   const [fontSize, setFontSize] = useState(16);
+  const [showSettings, setShowSettings] = useState(false);
 
   const [notes, setNotes] = useState([]);
 
@@ -32,10 +32,9 @@ export default function HomeScreen() {
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
 
-  const {
-    isSyncing,
-    processSyncQueue,
-  } = useSync();
+  const [showForm, setShowForm] =  useState(false);
+
+  const {isSyncing,processSyncQueue, } = useSync();
 
   const loadNotes = () => {
     const data = getNotes();
@@ -70,7 +69,6 @@ export default function HomeScreen() {
     setIsLoading(false);
   };
 
-
   const handleSearch = (text) => {
     setSearch(text);
 
@@ -101,11 +99,8 @@ export default function HomeScreen() {
     }
 
     if (editingId) {
-
       updateNote(editingId, title, content);
-
       setEditingId(null);
-
     } else {
       createNote(title, content);
     }
@@ -116,26 +111,22 @@ export default function HomeScreen() {
   if (!isConnected) {
 
     await addToQueue({
-      type: editingId
-        ? 'UPDATE'
-        : 'CREATE',
-
+      type: editingId ? 'UPDATE' : 'CREATE',
       title,
       content,
       time: Date.now(),
     });
-
     loadQueue();
   }
-
     loadNotes();
+    setShowForm(false);
   };
 
   const handleEdit = (note) => {
     setTitle(note.title);
     setContent(note.content);
-
     setEditingId(note.id);
+    setShowForm(true);
   };
 
   const handleDelete = (id) => {
@@ -170,104 +161,52 @@ export default function HomeScreen() {
     <View
       style={[
         styles.container,
-        {
-          backgroundColor: theme === 'dark' ? '#111827' : '#FFFFFF',
-        },
+        {  backgroundColor: theme === 'dark' ? '#111827' : '#FFFFFF', },
       ]}
     >
+
+      <TouchableOpacity
+        style={styles.settingsButton}
+        onPress={() =>
+          setShowSettings(true)
+        }
+      >
+        <Ionicons
+          name="settings-outline"
+          size={26}
+          color={ theme === 'dark' ? 'white' : 'black' }
+        />
+      </TouchableOpacity>
 
       <Text
         style={[
           styles.title,
-          {
-            color: theme === 'dark' ? 'white' : 'black',
-          },
+          {color: theme === 'dark' ? 'white' : 'black',},
         ]}
       >
         NoteApp
       </Text>
 
-      <TouchableOpacity
-        style={styles.logoutButton}
-        onPress={async () => {
-
-          await deleteToken();
-
-          setToken(null);
-        }}
+      <Text
+        style={[
+          styles.statusText,
+          {color: theme === 'dark' ? '#9CA3AF'  : '#6B7280', },
+        ]}
       >
-        <Text style={styles.buttonText}>
-          Logout
-        </Text>
-      </TouchableOpacity>
 
-    {!isConnected && <OfflineBanner />}
+        {!isConnected && 'Offline mode'}
 
-    {
-      queueCount > 0 && (
-        <QueueBanner
-          queueCount={queueCount}
-        />
-      )
-    }
+        {
+          queueCount > 0 &&
+          ` - Menunggu sinkronisasi: ${queueCount}`
+        }
 
-    {isSyncing && <SyncingBanner />}
+        {
+          isSyncing &&
+          ' - Sedang sinkronisasi...'
+        }
 
-      <TouchableOpacity
-        style={styles.themeButton}
-        onPress={async () => {
-
-          const newTheme =  theme === 'light' ? 'dark' : 'light';
-
-          setTheme(newTheme);
-
-          await saveTheme(newTheme);
-        }}
-      >
-        <Text style={styles.buttonText}>
-          Theme: {theme}
-        </Text>
-      </TouchableOpacity>
-
-      <View style={styles.fontContainer}>
-
-        <TouchableOpacity
-          style={styles.fontButton}
-          onPress={async () => {
-
-            if (fontSize <= 12) {
-              return;
-            }
-
-            const newSize = fontSize - 2;
-
-            setFontSize(newSize);
-
-            await saveFontSize(newSize);
-          }}
-        >
-          <Text style={styles.buttonText}>A-</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.fontButton}
-          onPress={async () => {
-
-            if (fontSize >= 30) {
-              return;
-            }
-
-            const newSize = fontSize + 2;
-
-            setFontSize(newSize);
-
-            await saveFontSize(newSize);
-          }}
-        >
-          <Text style={styles.buttonText}>A+</Text>
-        </TouchableOpacity>
-
-      </View>
+      </Text>
 
       <TextInput
         placeholder="Cari note..."
@@ -280,55 +219,59 @@ export default function HomeScreen() {
           styles.searchInput,
           {
             backgroundColor:theme === 'dark' ? '#1F2937' : 'white',
-
             color: theme === 'dark' ? 'white' : 'black',
           },
         ]}
       />
 
-      <TextInput
-        placeholder="Judul note"
-        placeholderTextColor={
-          theme === 'dark' ? '#9CA3AF' : '#6B7280'
-        }
-        value={title}
-        onChangeText={setTitle}
-        style={[
-          styles.input,
-          {
-            backgroundColor: theme === 'dark' ? '#1F2937' : 'white',
+      {
+        showForm && (
+          <>
+            <TextInput
+              placeholder="Judul note"
+              placeholderTextColor={
+                theme === 'dark' ? '#9CA3AF' : '#6B7280'
+              }
+              value={title}
+              onChangeText={setTitle}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme === 'dark' ? '#1F2937' : 'white',
+                  color: theme === 'dark' ? 'white' : 'black',
+                },
+              ]}
+            />
 
-            color: theme === 'dark' ? 'white' : 'black',
-          },
-        ]}
-      />
+            <TextInput
+              placeholder="Isi note"
+              placeholderTextColor={
+                theme === 'dark' ? '#9CA3AF' : '#6B7280'
+              }
+              value={content}
+              onChangeText={setContent}
+              multiline
+              style={[
+                styles.textArea,
+                {
+                  backgroundColor: theme === 'dark' ? '#1F2937' : 'white',
+                  color: theme === 'dark' ? 'white' : 'black',
+                },
+              ]}
+            />
 
-      <TextInput
-        placeholder="Isi note"
-        placeholderTextColor={
-          theme === 'dark' ? '#9CA3AF' : '#6B7280'
-        }
-        value={content}
-        onChangeText={setContent}
-        multiline
-        style={[
-          styles.textArea,
-          {
-            backgroundColor: theme === 'dark' ? '#1F2937' : 'white',
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSave}
+            >
+              <Text style={styles.saveButtonText}>
+                {editingId ? 'Update Note' : 'Tambah Note'}
+              </Text>
+            </TouchableOpacity>
 
-            color: theme === 'dark' ? 'white' : 'black',
-          },
-        ]}
-      />
-
-      <TouchableOpacity
-        style={styles.saveButton}
-        onPress={handleSave}
-      >
-        <Text style={styles.saveButtonText}>
-          {editingId ? 'Update Note' : 'Tambah Note'}
-        </Text>
-      </TouchableOpacity>
+          </>
+        )
+      }
 
       <FlatList
         data={notes}
@@ -346,12 +289,51 @@ export default function HomeScreen() {
         )}
       />
 
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => {
+          if (showForm) {
+            setEditingId(null);
+            setTitle('');
+            setContent('');
+          }
+          setShowForm(!showForm);
+        }}
+      >
+        <Ionicons
+          name={ showForm ? 'close' : 'add'}
+          size={32}
+          color="white"
+        />
+      </TouchableOpacity>
+
+      <SettingsModal
+      visible={showSettings}
+
+      onClose={() =>
+        setShowSettings(false)
+      }
+
+      theme={theme}
+      setTheme={setTheme}
+
+      fontSize={fontSize}
+      setFontSize={setFontSize}
+
+      saveTheme={saveTheme}
+      saveFontSize={saveFontSize}
+
+      onLogout={async () => {
+        await deleteToken();
+        setToken(null);
+        setShowSettings(false);
+      }}
+    />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-
   container: {
     flex: 1,
     padding: 20,
@@ -369,6 +351,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
+    textAlign: 'center',
+  },
+
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 
   input: {
@@ -398,6 +386,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     alignItems: 'center',
+    marginBottom: 10,
   },
 
   saveButtonText: {
@@ -405,41 +394,33 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  themeButton: {
-    backgroundColor: '#7C3AED',
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-
-  fontContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 15,
-  },
-
-  fontButton: {
-    backgroundColor: '#059669',
-    padding: 12,
-    borderRadius: 10,
-  },
-
   list: {
-    marginTop: 20,
+    marginTop: 12,
   },
 
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-
-  logoutButton: {
-    backgroundColor: '#DC2626',
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
+  statusText: {
     marginBottom: 10,
+    fontSize: 13,
   },
 
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#2563EB',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+  },
+  settingsButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    padding: 8,
+    zIndex: 10,
+    elevation: 10,
+  },
 });
